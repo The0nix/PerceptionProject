@@ -1,0 +1,3 @@
+accelerometer: 'data/sensorsAccelerometer.csv'
+gyroscope: 'data/sensorsGyroscope.csv'
+frames: 'data/sensorsFrameTimestamps.csv'
