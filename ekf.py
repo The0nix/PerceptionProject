@@ -1,16 +1,17 @@
 import numpy as np
+import equations
 
-import jacobian
 
 
 class EKF:
-    def __init__(self, x_init, P_init):
+    def __init__(self, x_init, P_init, Q):
         self.x_dim = x_init.shape[0]
         self.xs = [x_init]
         self.us = []
         self.P = P_init
 
         self.xs_xyz = [x_init[:3]]
+        self.Q = Q
 
     def _add_x(self, x):
         self.xs.append(x)
@@ -22,15 +23,19 @@ class EKF:
 
     def predict(self, u, delta_t):
         cur_x = self.xs[-1]
-        new_x = jacobian.f(x=cur_x, u=u, w=0, delta_t=delta_t)
+        w = np.zeros(u.shape[0])
+        new_x = equations.f(x=cur_x, u=u, w=w, delta_t=delta_t)
         self._add_x(new_x)
         self.us.append(u)
-        self.P = F @ self.P @ F.T + W @ Q @ W.T
+        F = equations.make_F(cur_x, u, w, delta_t)
+        W = equations.make_W(cur_x, u, w, delta_t)
+        self.P = F @ self.P @ F.T + W @ self.Q @ W.T
 
     def update(self, z):
-        cur_x = self.xs[-1]
-        P_inv = np.linalg.inv(self.P)
-        K = P_inv @ H.T @ np.linalg.inv(H @ P_inv @ H.T + V @ R @ V.T)
-        new_x = cur_x + K @ (z - utils.h(cur_x, 0))
-        self._update_x(new_x)
-        self.P = (self.eye(self.x_dim) - K @ H) @ self.P
+        raise NotImplementedError
+        # cur_x = self.xs[-1]
+        # P_inv = np.linalg.inv(self.P)
+        # K = P_inv @ H.T @ np.linalg.inv(H @ P_inv @ H.T + V @ R @ V.T)
+        # new_x = cur_x + K @ (z - utils.h(cur_x, 0))
+        # self._update_x(new_x)
+        # self.P = (self.eye(self.x_dim) - K @ H) @ self.P

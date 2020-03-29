@@ -1,4 +1,7 @@
-import numpy as np
+# import numpy as np
+import jax.numpy as np
+from jax import jacfwd
+from jax.ops import index_update
 
 
 def C_b_v(angles):
@@ -11,19 +14,19 @@ def C_b_v(angles):
 
     result = np.zeros(shape=(3, 3))
     #first row
-    result[0, 0] = np.cos(psi) * np.cos(theta)
-    result[0, 1] = np.cos(psi) * np.sin(theta) * np.sin(phi) - np.sin(psi) * np.cos(phi)
-    result[0, 2] = np.cos(psi) * np.sin(theta) * np.cos(phi) + np.sin(psi) * np.sin(phi)
+    result = index_update(result, (0, 0), np.cos(psi) * np.cos(theta))
+    result = index_update(result, (0, 1), np.cos(psi) * np.sin(theta) * np.sin(phi) - np.sin(psi) * np.cos(phi))
+    result = index_update(result, (0, 2), np.cos(psi) * np.sin(theta) * np.cos(phi) + np.sin(psi) * np.sin(phi))
 
     # second row
-    result[1, 0] = np.sin(psi) * np.cos(theta)
-    result[1, 1] = np.sin(psi) * np.sin(theta) * np.sin(phi) + np.cos(psi) * np.cos(phi)
-    result[1, 2] = np.sin(psi) * np.sin(theta) * np.cos(phi) - np.cos(psi) * np.sin(phi)
+    result = index_update(result, (1, 0), np.sin(psi) * np.cos(theta))
+    result = index_update(result, (1, 1), np.sin(psi) * np.sin(theta) * np.sin(phi) + np.cos(psi) * np.cos(phi))
+    result = index_update(result, (1, 2), np.sin(psi) * np.sin(theta) * np.cos(phi) - np.cos(psi) * np.sin(phi))
 
     # third row
-    result[2, 0] = -np.sin(theta)
-    result[2, 1] = np.cos(theta) * np.sin(phi)
-    result[2, 2] = np.cos(theta) * np.cos(phi)
+    result = index_update(result, (2, 0), -np.sin(theta))
+    result = index_update(result, (2, 1), np.cos(theta) * np.sin(phi))
+    result = index_update(result, (2, 2), np.cos(theta) * np.cos(phi))
 
     return result
 
@@ -42,11 +45,12 @@ def f_euler_update(x, u, w, delta_t):
     phi, theta, psi = x.flatten()[:3]
 
     result = np.zeros(shape=3)
-    result[0] = (omega_y * np.sin(phi) + omega_z * np.cos(phi)) * np.tan(theta) + omega_x
-    result[1] = omega_y * np.cos(phi) - omega_z * np.sin(phi)
-    result[2] = (omega_y * np.sin(phi) + omega_z * np.cos(phi)) * (1./np.cos(theta))
+    result = index_update(result, 0, (omega_y * np.sin(phi) + omega_z * np.cos(phi)) * np.tan(theta) + omega_x)
+    result = index_update(result, 1, omega_y * np.cos(phi) - omega_z * np.sin(phi))
+    result = index_update(result, 2, (omega_y * np.sin(phi) + omega_z * np.cos(phi)) * (1./np.cos(theta)))
 
     return result.reshape(-1, 1) * delta_t
+
 
 def omega_unbiased(omega, bias, noise):
     return omega - bias - noise
@@ -56,7 +60,7 @@ def acc_unbiased(acc, bias, noise):
     return acc - bias - noise
 
 
-def f(x, u, w, delta_t, g_v = np.array([0, 0, 9.81])):
+def f(x, u, w, delta_t, g_v=None):
     """
 
     :param x: state vector, np.ndarray, shape: (15,1)
@@ -66,6 +70,8 @@ def f(x, u, w, delta_t, g_v = np.array([0, 0, 9.81])):
     :param g_v: acceleration of gravity, np.ndarray: shape: (3,)
     :return: state vector at the next time step, np.ndarray, shape: (15,1)
     """
+    if g_v is None:
+        g_v = np.array([0, 0, 9.81])
 
     result = np.zeros(shape=15)
     angles = x.flatten()[:3]
@@ -86,14 +92,15 @@ def f(x, u, w, delta_t, g_v = np.array([0, 0, 9.81])):
 
     trans_matrix = C_b_v(angles)
 
-    result[:3] = angles + f_euler_update(x=x, u=u_unbiased, w=w, delta_t=delta_t).flatten()
-    result[3:6] = pose_coordinates + velocity * delta_t + \
-                  0.5 * delta_t**2 * (trans_matrix @ u_unbiased[3:] + g_v)
-    result[6:9] = velocity + delta_t * (trans_matrix @ u_unbiased[3:] + g_v)
-    result[9:12] = bias_omega
-    result[12:15] = bias_acc
+    result = index_update(result, slice(0, 3), angles + f_euler_update(x=x, u=u_unbiased, w=w, delta_t=delta_t).flatten())
+    result = index_update(result, slice(3, 6), pose_coordinates + velocity * delta_t + \
+                  0.5 * delta_t**2 * (trans_matrix @ u_unbiased[3:] + g_v))
+    result = index_update(result, slice(6, 9), velocity + delta_t * (trans_matrix @ u_unbiased[3:] + g_v))
+    result = index_update(result, slice(9, 12), bias_omega)
+    result = index_update(result, slice(12, 15), bias_acc)
 
     return result.reshape(-1, 1)
+
 
 def jac_f_euler_angles(x, u, delta_t):
     """
@@ -111,18 +118,22 @@ def jac_f_euler_angles(x, u, delta_t):
     result = np.zeros(shape=(3,3))
 
     # first row
-    result[0, 0] = (omega_y * np.cos(phi) - omega_z * np.sin(phi)) * np.tan(theta)
-    result[0, 1] = (omega_y * np.sin(phi) + omega_z * np.cos(phi)) * (1./np.cos(theta))**2
+    result = index_update(result, (0, 0), (omega_y * np.cos(phi) - omega_z * np.sin(phi)) * np.tan(theta))
+    result = index_update(result, (0, 1), (omega_y * np.sin(phi) + omega_z * np.cos(phi)) * (1./np.cos(theta))**2)
 
     # second row
-    result[1, 0] =  -omega_y * np.sin(phi) - omega_z * np.cos(phi)
+    result = index_update(result, (1, 0),  -omega_y * np.sin(phi) - omega_z * np.cos(phi))
 
     # third row
-    result[2, 0] = (omega_y * np.cos(phi) - omega_z * np.sin(phi))*(1./np.cos(theta))
-    result[2, 1] = (omega_y * np.sin(phi) + omega_z * np.cos(phi))*(np.sin(theta)/(np.cos(theta)**2))
+    result = index_update(result, (2, 0), (omega_y * np.cos(phi) - omega_z * np.sin(phi))*(1./np.cos(theta)))
+    result = index_update(result, (2, 1), (omega_y * np.sin(phi) + omega_z * np.cos(phi))*(np.sin(theta)/(np.cos(theta)**2)))
 
     return result * delta_t
 
+
+def c_b_v_angles(angles, acc):
+    C = C_b_v(angles)
+    return C @ acc
 
 def jac_c_b_v_angles(angles, acc): # uff...
     """
@@ -139,31 +150,31 @@ def jac_c_b_v_angles(angles, acc): # uff...
     result = np.zeros(shape=(3,3))
 
     # first row
-    result[0, 0] = a_y * (np.cos(psi) * np.sin(theta) * np.cos(phi) + np.sin(psi) * np.sin(phi)) + \
-                   a_z * (-np.cos(psi) * np.sin(theta) * np.sin(phi) + np.sin(psi) * np.cos(phi))
-    result[0, 1] = a_x * (-np.cos(psi) * np.sin(theta)) + \
+    result = index_update(result, (0, 0), a_y * (np.cos(psi) * np.sin(theta) * np.cos(phi) + np.sin(psi) * np.sin(phi)) + \
+                   a_z * (-np.cos(psi) * np.sin(theta) * np.sin(phi) + np.sin(psi) * np.cos(phi)))
+    result = index_update(result, (0, 1), a_x * (-np.cos(psi) * np.sin(theta)) + \
                    a_y * (np.cos(psi) * np.cos(theta) * np.sin(phi)) + \
-                   a_z * (np.cos(psi) * np.cos(theta) * np.cos(phi))
-    result[0, 2] = a_x * (-np.sin(psi) * np.cos(theta)) + \
+                   a_z * (np.cos(psi) * np.cos(theta) * np.cos(phi)))
+    result = index_update(result, (0, 2), a_x * (-np.sin(psi) * np.cos(theta)) + \
                    a_y * (-np.sin(psi) * np.sin(theta) * np.sin(phi) - np.cos(psi) * np.cos(phi)) + \
-                   a_z * (-np.sin(psi) * np.sin(theta) * np.cos(phi) + np.cos(psi) * np.sin(phi))
+                   a_z * (-np.sin(psi) * np.sin(theta) * np.cos(phi) + np.cos(psi) * np.sin(phi)))
 
     # second row
-    result[1, 0] = a_y * (np.sin(psi) * np.sin(theta) * np.cos(phi) - np.cos(psi) * np.sin(phi)) + \
-                   a_z * (-np.sin(psi) * np.sin(theta) * np.sin(phi) - np.cos(psi) * np.cos(phi))
-    result[1, 1] = a_x * (-np.sin(psi) * np.sin(theta)) + \
+    result = index_update(result, (1, 0), a_y * (np.sin(psi) * np.sin(theta) * np.cos(phi) - np.cos(psi) * np.sin(phi)) + \
+                   a_z * (-np.sin(psi) * np.sin(theta) * np.sin(phi) - np.cos(psi) * np.cos(phi)))
+    result = index_update(result, (1, 1), a_x * (-np.sin(psi) * np.sin(theta)) + \
                    a_y * (np.sin(psi) * np.cos(theta) * np.sin(phi)) + \
-                   a_z * (np.sin(psi) * np.cos(theta) * np.cos(phi))
-    result[1, 2] = a_x * (np.cos(psi) * np.cos(theta)) + \
+                   a_z * (np.sin(psi) * np.cos(theta) * np.cos(phi)))
+    result = index_update(result, (1, 2), a_x * (np.cos(psi) * np.cos(theta)) + \
                    a_y * (np.cos(psi) * np.sin(theta) * np.sin(phi) - np.sin(psi) * np.cos(phi)) + \
-                   a_z * (np.cos(psi) * np.sin(theta) * np.cos(phi) + np.sin(psi) * np.sin(phi))
+                   a_z * (np.cos(psi) * np.sin(theta) * np.cos(phi) + np.sin(psi) * np.sin(phi)))
 
-    result[2, 0] = a_y * (np.cos(theta) * np.cos(psi)) + \
-                   a_z(-np.cos(theta) * np.sin(phi))
-    result[2, 1] = a_x * (-np.cos(theta)) + \
+    result = index_update(result, (2, 0), a_y * (np.cos(theta) * np.cos(psi)) + \
+                   a_z * (-np.cos(theta) * np.sin(phi)))
+    result = index_update(result, (2, 1), a_x * (-np.cos(theta)) + \
                    a_y * (-np.sin(theta) * np.sin(phi)) + \
-                   a_z * (-np.sin(theta) * np.cos(phi))
-    result[2, 2] = 0
+                   a_z * (-np.sin(theta) * np.cos(phi)))
+    result = index_update(result, (2, 2), 0)
 
     return result
 
@@ -173,6 +184,7 @@ def jac_f_x(x, u, w, delta_t):
 
     :param x: state vector, np.ndarray, shape: (15,1)
     :param u: measurements vector, np.ndarray, shape: (6,1)
+    :param w: noise vector, np.ndarray, shape: (6,1)
     :param delta_t: time step, scalar
     :return: jacobian of transition function with respect to state
                 np.ndarray, shape: (15, 15)
@@ -193,14 +205,24 @@ def jac_f_x(x, u, w, delta_t):
 
     result = np.zeros(shape=(15, 15))
 
-    result[:3, :3] = jac_f_euler_angles(x=x, u=u_unbiased, delta_t=delta_t)
+    result = index_update(result, [slice(0, 3), slice(0,3)], jac_f_euler_angles(x=x, u=u_unbiased, delta_t=delta_t))
 
-    result[3:6, :3] = 0.5 * delta_t**2 * jac_c_b_v_angles(angles=angles, acc=u_unbiased.flatten()[3:])
-    result[3:6, 3:6] = np.identity(3)
-    result[3:6, 6:9] = delta_t * np.identity(3)
+    result = index_update(result, [slice(3, 6), slice(0,3)], 0.5 * delta_t**2 * jac_c_b_v_angles(angles=angles, acc=u_unbiased.flatten()[3:]))
+    result = index_update(result, [slice(3, 6), slice(3,6)], np.identity(3))
+    result = index_update(result, [slice(3, 6), slice(6,9)], delta_t * np.identity(3))
 
-    result[6:9, :3] = delta_t * jac_c_b_v_angles(angles=angles, acc=u_unbiased.flatten()[3:])
-    result[6:9, 6:9] = np.identity(3)
+    result = index_update(result, [slice(6, 9), slice(0,3)], delta_t * jac_c_b_v_angles(angles=angles, acc=u_unbiased.flatten()[3:]))
+    result = index_update(result, [slice(6, 9), slice(6,9)], np.identity(3))
 
-    result[9:12, 9:12] = np.identity(3)
-    result[12:15, 12:15] = np.identity(3)
+    result = index_update(result, [slice(9, 12), slice(9,12)], np.identity(3))
+    result = index_update(result, [slice(12, 15), slice(12,15)], np.identity(3))
+
+    return result
+
+_make_F = jacfwd(f, argnums=0)
+def make_F(x, u, w, delta_t):
+    return _make_F(x, u, w, delta_t).reshape(x.shape[0], x.shape[0])
+
+_make_W = jacfwd(f, argnums=2)
+def make_W(x, u, w, delta_t):
+    return _make_W(x, u, w, delta_t).reshape(x.shape[0], w.shape[0])
