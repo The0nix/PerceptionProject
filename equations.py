@@ -227,7 +227,7 @@ _make_F = jacfwd(f, argnums=0)
 def make_F(x, u, w, delta_t):
     return _make_F(x, u, w, delta_t).reshape(x.shape[0], x.shape[0])
 
-_make_W = jacfwd(f, argnums=2)
+_make_W = jacfwd(f, argnums=1)
 def make_W(x, u, w, delta_t):
     return _make_W(x, u, w, delta_t).reshape(x.shape[0], w.shape[0])
 
