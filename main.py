@@ -27,9 +27,9 @@ if __name__ == '__main__':
 
     slice_ = slice(None,None,skip_frames)
     dataset = np.load(dataset_path)
-    accelerometer = dataset['acc'][slice_]
+    accelerometer = dataset['acc_linear'][slice_]
     gyroscope = dataset['gyro'][slice_]
-    timestamps = accelerometer[:,0][slice_]
+    timestamps = accelerometer[:,0]
     visual_rots = dataset['visual_rot']
     visual_tvecs = dataset['visual_tvec']
     visual_ts = dataset['visual_time']
@@ -59,10 +59,10 @@ if __name__ == '__main__':
             position = visual_tvecs[visual_ix].ravel()
             z = np.hstack([angles, position])
             model.update(z)
-            # visual_ix += 1
+            visual_ix += 1
         prev_ts = ts
         if animate:
-            plotter.plot_trajectory(model.xs_xyz)
+            plotter.plot_trajectory(model.xs_xyz, visual_rots[visual_ix])
 
     if output:
         np.savetxt(output, np.vstack(model.xs_xyz))

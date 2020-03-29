@@ -29,8 +29,8 @@ class EKF:
         new_x = equations.f(x=cur_x, u=u, w=w, delta_t=delta_t).ravel()
         self._add_x(new_x)
         self.us.append(u)
-        F = equations.make_F(cur_x, u, w, delta_t)
-        W = equations.make_W(cur_x, u, w, delta_t)
+        F = np.eye(15)  # equations.make_F(cur_x, u, w, delta_t)
+        W = np.eye(15, 6)  # equations.make_W(cur_x, u, w, delta_t)
         self.P = F @ self.P @ F.T + W @ self.Q @ W.T
 
     def update(self, z):

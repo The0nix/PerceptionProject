@@ -13,11 +13,13 @@ class Plotter:
         plt.ion()
         plt.show()
 
-    def plot_trajectory(self, xs_xyz):
+    def plot_trajectory(self, xs_xyz, C):
         plt.cla()
         if self.real is not None:
             self.ax.plot(*zip(*self.real), c='green')
         self.ax.plot(*zip(*xs_xyz), c=self.color)
+
+        self.ax.plot(*zip(xs_xyz[-1], xs_xyz[-1] + C @ np.array([0, 0, -1]) * 0.05), c='red')
         self.ax.scatter(*(xs_xyz[-1]), c=self.dot_color, s=10 ** 2)
         self.ax.scatter(0, 0, 0, marker='x', s=10 ** 2, c='red')
         plt.draw()
