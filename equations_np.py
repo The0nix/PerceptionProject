@@ -68,7 +68,7 @@ def f(x, u, w, delta_t, g_v=None):
     :return: state vector at the next time step, np.ndarray, shape: (15,1)
     """
     if g_v is None:
-        g_v = np.array([0, -9.81, 0])
+        g_v = np.array([0, 0, -9.81])
 
     result = np.zeros(shape=15)
     angles = x.flatten()[:3]

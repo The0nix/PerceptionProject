@@ -38,7 +38,7 @@ if __name__ == '__main__':
         plotter = utils.Plotter(real=visual_tvecs.reshape(-1, 3))
 
     state_dim = 15
-    x_init = np.zeros(state_dim)  # TODO: Make proper initialization
+    x_init = np.zeros(state_dim)
     x_init[:3] = np.array(utils.angles_from_C(visual_rots[0]))
     x_init[3:6] = visual_tvecs[0].ravel()
     P_init = 1e-1 * np.eye(state_dim)
@@ -50,14 +50,16 @@ if __name__ == '__main__':
     prev_ts = timestamps[0] - (timestamps[1] - timestamps[0])
     for imu_ix, ts in enumerate(tqdm(timestamps)):
         u = np.hstack([gyroscope[imu_ix,1:], accelerometer[imu_ix,1:]])
-        delta_t = ts - prev_ts
+        delta_t = (ts - prev_ts)
         model.predict(u, delta_t)
         if not no_update and visual_ts[visual_ix] <= ts:
+            while visual_ts[visual_ix] <= ts:
+                visual_ix += 1
             angles = np.array(utils.angles_from_C(visual_rots[visual_ix]))
             position = visual_tvecs[visual_ix].ravel()
             z = np.hstack([angles, position])
             model.update(z)
-            visual_ix += 1
+            # visual_ix += 1
         prev_ts = ts
         if animate:
             plotter.plot_trajectory(model.xs_xyz)
