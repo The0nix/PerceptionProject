@@ -71,7 +71,7 @@ def f(x, u, w, delta_t, g_v=None):
     :return: state vector at the next time step, np.ndarray, shape: (15,1)
     """
     if g_v is None:
-        g_v = np.array([0, 0, 9.81])
+        g_v = np.array([-9.81, 0, 0])
 
     result = np.zeros(shape=15)
     angles = x.flatten()[:3]
@@ -129,6 +129,10 @@ def jac_f_euler_angles(x, u, delta_t):
     result = index_update(result, (2, 1), (omega_y * np.sin(phi) + omega_z * np.cos(phi))*(np.sin(theta)/(np.cos(theta)**2)))
 
     return result * delta_t
+
+def h(x, v):
+    result = x[:6] + v
+    return result
 
 
 def c_b_v_angles(angles, acc):
@@ -226,3 +230,11 @@ def make_F(x, u, w, delta_t):
 _make_W = jacfwd(f, argnums=2)
 def make_W(x, u, w, delta_t):
     return _make_W(x, u, w, delta_t).reshape(x.shape[0], w.shape[0])
+
+_make_H = jacfwd(h, argnums=0)
+def make_H(x, v):
+    return _make_H(x, v).reshape(x.shape[0], x.shape[0])
+
+_make_V = jacfwd(h, argnums=1)
+def make_V(x, v):
+    return _make_V(x, v).reshape(6, x.shape[0])
