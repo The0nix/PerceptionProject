@@ -53,11 +53,11 @@ def f_euler_update(x, u, w, delta_t):
 
 
 def omega_unbiased(omega, bias, noise):
-    return omega - bias - noise
+    return omega - bias.ravel() - noise.ravel()
 
 
 def acc_unbiased(acc, bias, noise):
-    return acc - bias - noise
+    return acc.ravel() - bias.ravel() - noise.ravel()
 
 
 def f(x, u, w, delta_t, g_v=None):
