@@ -13,19 +13,14 @@ parser = argparse.ArgumentParser(description='EKF localization by video')
 parser.add_argument('-a', '--animate', action='store_true', help='Show animation of trajectory')
 parser.add_argument('-i', '--input', type=str, help='Input dataset path', default='data/dataset_real.npz')
 parser.add_argument('-o', '--output', type=str, help='File to output trajectory to')
-parser.add_argument('-m', '--movie-file', type=str, help='File to output trajectory to')
 parser.add_argument('-s', '--skip-frames', type=int, default=1, help='How many IMU measurements to skip at each step')
-parser.add_argument('--no-update', action='store_true', help='Disable update step')
-
 
 
 if __name__ == '__main__':
     args = parser.parse_args()
     animate = True if args.animate or args.movie_file else False
     dataset_path = args.input
-    movie_file = args.movie_file
     output = args.output
-    no_update = args.no_update
     skip_frames = args.skip_frames
 
     slice_ = slice(None,None,skip_frames)
@@ -51,26 +46,22 @@ if __name__ == '__main__':
     ##### Main loop #####
     visual_ix = 0
     prev_ts = timestamps[0] - (timestamps[1] - timestamps[0])
-    movie_writer = utils.get_movie_writer('EKF', 10, 0.001)
-    with movie_writer.saving(plotter.fig, movie_file, len(accelerometer)) if movie_file else utils.get_dummy_context_mgr():
-        for imu_ix, ts in enumerate(tqdm(timestamps)):
-            u = np.hstack([gyroscope[imu_ix,1:], accelerometer[imu_ix,1:]])
-            delta_t = (ts - prev_ts)
-            model.predict(u, delta_t)
-            if not no_update and visual_ts[visual_ix] <= ts:
-                while visual_ts[visual_ix] <= ts:
-                    visual_ix += 1
-                angles = np.array(utils.angles_from_C(visual_rots[visual_ix]))
-                position = visual_tvecs[visual_ix].ravel()
-                z = np.hstack([angles, position])
-                model.update(z)
+    for imu_ix, ts in enumerate(tqdm(timestamps)):
+        u = np.hstack([gyroscope[imu_ix,1:], accelerometer[imu_ix,1:]])
+        delta_t = (ts - prev_ts)
+        model.predict(u, delta_t)
+        if visual_ts[visual_ix] <= ts:
+            while visual_ts[visual_ix] <= ts:
                 visual_ix += 1
-            prev_ts = ts
-            if animate:
-                C = equations.C_b_v(model.xs[-1][:3])
-                plotter.plot_trajectory(model.xs_xyz, C)
-            if movie_file:
-                movie_writer.grab_frame()
+            angles = np.array(utils.angles_from_C(visual_rots[visual_ix]))
+            position = visual_tvecs[visual_ix].ravel()
+            z = np.hstack([angles, position])
+            model.update(z)
+            visual_ix += 1
+        prev_ts = ts
+        if animate:
+            C = equations.C_b_v(model.xs[-1][:3])
+            plotter.plot_trajectory(model.xs_xyz, C)
 
     if output:
         np.savetxt(output, np.vstack(model.xs_xyz))

@@ -48,25 +48,3 @@ def wrap_angle(angle, r1, r2, wrapper=2 * np.pi):
         angle -= wrapper
 
     return angle
-
-def get_movie_writer(title, movie_fps, plot_pause_len):
-    """
-    :param title: The title of the movie with which the movie writer will be initialized.
-    :param movie_fps: The frame rate of the movie to write.
-    :param plot_pause_len: The pause durations between the frames when showing the plots.
-    :return: A movie writer that enables writing MP4 movie with the animation from SLAM.
-    """
-
-    get_ff_mpeg_writer = anim.writers['ffmpeg']
-    metadata = dict(title=title, artist='matplotlib', comment='EKF')
-    movie_fps = min(movie_fps, float(1. / plot_pause_len))
-
-    return get_ff_mpeg_writer(fps=movie_fps, metadata=metadata)
-
-
-@contextlib.contextmanager
-def get_dummy_context_mgr():
-    """
-    :return: A dummy context manager for conditionally writing to a movie file.
-    """
-    yield None
